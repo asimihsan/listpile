@@ -13,6 +13,8 @@
 #   a bad environment, etc.
 # ---------------------------------------------------------------------------
 
+# watchmedo shell-command --patterns="*.py" --recursive --command="clear; date; pgrep nosetests; if [[ \`pgrep nosetests\` == '' ]]; tn nosetests --no-skip --detailed-errors --stop --verbosity=2 --logging-filter=authauth --tests=test/; fi"
+
 import os
 import sys
 import zmq
@@ -34,10 +36,11 @@ assert(os.path.isdir(code_filepath))
 script_under_test = os.path.join(code_filepath, "authauth_model.py")
 assert(os.path.isfile(script_under_test))
 
-CMD_TEMPLATE = Template(""" ${executable} --zeromq_binding ${zeromq_binding} --empty_database --database_filepath ${database_filepath} --verbose """)
+CMD_TEMPLATE = Template(""" ${executable} --zeromq_binding ${zeromq_binding} --empty_database --database_filepath ${database_filepath} """)
 SERVER_ZEROMQ_BINDING = "tcp://*:5556"
 CLIENT_ZEROMQ_BINDING = "tcp://localhost:5556"
 DATABASE_FILEPATH = "authauth.db"
+VERBOSE = False
 # ---------------------------------------------------------------------------
 
 class TimeoutException(Exception):
@@ -65,6 +68,8 @@ class TestBasic(unittest.TestCase):
         self.process_cmd = CMD_TEMPLATE.substitute(executable = script_under_test,
                                                    zeromq_binding = SERVER_ZEROMQ_BINDING,
                                                    database_filepath = DATABASE_FILEPATH)
+        if VERBOSE:
+            self.process_cmd += " --verbose"
         self.process = self._execute_command(self.process_cmd,
                                              capture_output = True)
         # --------------------------------------------------------------------
@@ -122,6 +127,30 @@ class TestBasic(unittest.TestCase):
         message = socket.recv()
         return message
 
+    def _get_user(self, user_type, **kwds):
+        message_type = "get_user"
+        message_args = {"user_type": user_type}
+        for (key, value) in kwds.iteritems():
+            message_args[key] = value
+        self.send_message(message_type, message_args)
+        reply = self.get_message()
+        assert_not_equal(reply, None)
+        reply_decoded = json.loads(reply)
+        assert_equal(reply_decoded["message_type"], "get_user_response")
+        return reply_decoded
+
+    def _add_user(self, user_type, **kwds):
+        message_type = "add_user"
+        message_args = {"user_type": user_type}
+        for (key, value) in kwds.iteritems():
+            message_args[key] = value
+        self.send_message(message_type, message_args)
+        reply = self.get_message()
+        assert_not_equal(reply, None)
+        reply_decoded = json.loads(reply)
+        assert_equal(reply_decoded["message_type"], "add_user_response")
+        return reply_decoded
+
     def test_001_is_runnable(self):
         """ Still running after we launch it.
 
@@ -151,38 +180,47 @@ class TestBasic(unittest.TestCase):
 
     def test_003_get_user_by_google_email_when_empty_returns_nothing(self):
         """ When database empty getting user by Google email returns nothing."""
-        message_type = "get_user"
-        message_args = {"user_type": "google",
-                        "email": "user@host.com"}
-        self.send_message(message_type, message_args)
-        reply = self.get_message()
-        assert_not_equal(reply, None)
-        reply_decoded = json.loads(reply)
-        assert_equal(reply_decoded["message_type"], "get_user_response")
+        reply_decoded = self._get_user("google",
+                                       email = "user@host.com")
         assert_equal(reply_decoded["status"], "ok")
         assert_equal(reply_decoded["user_id"], None)
 
     def test_004_add_then_get_user_by_google_email(self):
         """ Add a user by Google email, then get it."""
-        message_type = "add_user"
-        message_args = {"user_type": "google",
-                        "email": "user@host.com"}
-        self.send_message(message_type, message_args)
-        reply = self.get_message()
-        assert_not_equal(reply, None)
-        reply_decoded = json.loads(reply)
-        message_type = reply_decoded.get("message_type", None)
-        assert_equal(reply_decoded["message_type"], "add_user_response")
+        reply_decoded = self._add_user("google",
+                                       email = "user@host.com")
         assert_equal(reply_decoded["status"], "ok")
+        user_id = reply_decoded["user_id"]
 
-        message_type = "get_user"
-        message_args = {"user_type": "google",
-                        "email": "user@host.com"}
-        self.send_message(message_type, message_args)
-        reply = self.get_message()
-        assert_not_equal(reply, None)
-        reply_decoded = json.loads(reply)
-        assert_equal(reply_decoded["message_type"], "get_user_response")
+        reply_decoded = self._get_user("google",
+                                       email = "user@host.com")
         assert_equal(reply_decoded["status"], "ok")
         assert_not_equal(reply_decoded["user_id"], None)
+        assert_equal(reply_decoded["user_id"], user_id)
+
+    def test_005_add_then_delete_then_get_user_by_google_email(self):
+        """ Add a user by Google email. Delete it. Get it by Google email.
+
+        Thereafter shouldn't exist."""
+        assert()
+
+    def test_006_get_user_by_user_id(self):
+        """ Add a user by Google email. Get it by user ID.
+
+        We expect to get all acccounts associated with the user ID. At
+        this point there's only one account, a Google account.
+
+        To stick to DRY we can only determine what accounts exist;
+        getting details for a particular account (e.g. 'google')
+        requires further database dips."""
+        assert()
+
+    def test_007_add_then_delete_user_by_user_id_then_get_by_user_id(self):
+        """ Add a user by Google email. Delete it by internal user ID.
+
+        We expect the user to no longer exist, verify by getting
+        by internal user ID after and seeing 'user_id' = None."""
+        assert()
+
+
 
