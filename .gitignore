@@ -1,3 +1,6 @@
+# authauth DB not tracked.
+*.db
+
 *.py[co]
 
 # Packages
