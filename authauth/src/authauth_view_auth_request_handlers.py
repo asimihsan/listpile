@@ -385,7 +385,7 @@ class LoginGoogleHandler(BaseLoginHandler, tornado.auth.GoogleMixin):
         #!!AI TODO. We redirect to an entirely different IP:port, should
         # be configurable. In order to UT this we have another
         # simple server listening here.
-        self.redirect("http://10.227.33.1:8001/login/google/successful/")
+        self.redirect("http://localhost:8000/login/google/successful/")
 # ----------------------------------------------------------------------------
 
 def adjust_request_host_to_referer(request):

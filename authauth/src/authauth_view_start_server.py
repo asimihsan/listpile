@@ -30,7 +30,7 @@ from authauth_view_auth_request_handlers import LogoutHandler
 #   Constants.
 # ----------------------------------------------------------------------
 APP_NAME = 'authauth_view_start_server'
-LOG_PATH = '/var/log/'
+LOG_PATH = os.path.join(__file__, os.pardir)
 # ----------------------------------------------------------------------
 
 # ----------------------------------------------------------------------
