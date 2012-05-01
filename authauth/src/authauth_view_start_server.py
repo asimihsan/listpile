@@ -50,6 +50,8 @@ define("debug_mode", default=None, help="Tornado debug mode enabled or not")
 
 define("twitter_consumer_key", default=None, help="Twitter app consumer key")
 define("twitter_consumer_secret", default=None, help="Twitter app consumer secret")
+
+define("test", default=None, help="Set if you're doing UT/FV")
 # ----------------------------------------------------------------------
 
 # ----------------------------------------------------------------------
@@ -146,16 +148,29 @@ if __name__ == "__main__":
 
     # ------------------------------------------------------------------------
     #   Import settings.
+    #
+    #   -   Always load the config file in the same directory as this file
+    #       first.
+    #   -   If it exists load a file with the same filename in the test
+    #       directory, to allow us a special case of listening on localhost.
     # ------------------------------------------------------------------------
-    config_filepath = os.path.join(os.path.dirname(__file__), "authauth_view_server.conf")
-    assert(os.path.isfile(config_filepath))
-    tornado.options.parse_config_file(config_filepath)
+    command_line_args = tornado.options.parse_command_line()
 
-    #!!AI causes the execution to freeze, debug later.
-    #tornado.options.parse_command_line()
+    this_directory = os.path.dirname(__file__)
+    config_paths = [os.path.join(this_directory, "authauth_view_server.conf")]
+
+    if options.test:
+        test_config_path = os.path.abspath(os.path.join(this_directory, os.pardir, "test", "authauth_view_server.conf"))
+        logger.debug("test_config_path: %s" % (test_config_path, ))
+        if os.path.isfile(test_config_path):
+            config_paths.append(test_config_path)
+    logger.info("config files to use, in order: %s" % (pprint.pformat(config_paths), ))
+    for filepath in config_paths:
+        assert(os.path.isfile(filepath))
+        tornado.options.parse_config_file(filepath)
     # ------------------------------------------------------------------------
 
-    logger.debug("start listening on port %s" % (options.http_listen_port, ))
+    logger.debug("start listening on %s:%s" % (options.http_listen_ip_address, options.http_listen_port))
     http_server = tornado.httpserver.HTTPServer(Application(),
                                                 xheaders=True)
     http_server.bind(port = options.http_listen_port,

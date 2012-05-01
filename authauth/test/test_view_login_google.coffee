@@ -1,8 +1,15 @@
 casper = require('casper').create verbose: true, logLevel: 'debug'
 
-casper.start 'http://localhost:8000/login/google', ->
+username = "iamatestuser@asimihsan.com"
+password = "reds922(zest"
+start_url = "http://localhost:8000/login/google"
+end_url = "http://localhost:8000/login/google/successful/"
+screenshot_directory = "test_view_login_google_output/"
+
+casper.start start_url, ->
     @log "Go to /login/google on authauth view to authicate using Google.", "debug"
-    @capture "test_view_output/01_login_google.png"
+    casper.viewport(1024, 768)
+    @capture screenshot_directory + "01_login_google.png"
 
     # -----------------------------------------------------------------------
     #  Validate assumptions.
@@ -18,32 +25,38 @@ casper.start 'http://localhost:8000/login/google', ->
     # -----------------------------------------------------------------------
     #  Fill in the form, then submit.
     # -----------------------------------------------------------------------
+    @fill "form#gaia_loginform", { "Email":  username, "Passwd": password }
+    @evaluate ->
+        document.querySelector("input#PersistentCookie").checked = false
     @wait 3000, ->
-        @click "input#PersistentCookie"
-        @fill "form#gaia_loginform", { "Email":  "iamatestuser@asimihsan.com", "Passwd": "xxxxxxxxxx" }, true
-    # @capture "test_view_output/02_login_google_form_filled.png"
-    # @click "input#signIn"
+        @capture screenshot_directory + "02_login_google_form_filled.png"
+        @click "input#signIn"
     # -----------------------------------------------------------------------
 
 casper.then ->
-    @wait 10000, ->
-        @log "Tell Google that we want to permit this application to access our data", "debug"
-        @capture "test_view_output/03_login_google_before_permit.png"
-        @log "Current URI: #{ @getCurrentUrl() }"
-        @waitForSelector "input#approve_button",
-            ->
-                @capture "test_view_output/04_login_google_after_permit.png"
-                @click "input#approve_button",
-            ->
-                @die "approve_button didn't show up in time.",
-                10000 
+    @waitForSelector "input#approve_button", ->
+        @waitForSelector "#remember_choices_checkbox", ->
+            @log "Current URI: #{ @getCurrentUrl() }"
+            @capture screenshot_directory + "03_login_google_after_permit.png"
+            @evaluate ->
+                document.querySelector("#remember_choices_checkbox").checked = false
+            @click "input#approve_button",
+        ->
+            @die "remember_choices_checkbox didn't show up in time.",
+            10000,
+    ->
+        @die "approve_button didn't show up in time.",
+        10000 
 
 casper.then ->
     @log "We should get redirected to the successful authentication URI."
-    @capture "test_view_output/05_login_google_before_final_page.png"
-    @wait 3000
-    @log "Current URI: #{ @getCurrentUrl() }"
-    @capture "test_view_output/06_log_google_after_final_page.png"
+    @capture screenshot_directory + "05_login_google_before_final_page.png"
+    @wait 10000, ->
+        @capture screenshot_directory + "06_log_google_after_final_page.png"
+        @log "Current URI: #{ @getCurrentUrl() }"
+        @test.assertEquals(@getCurrentUrl(), end_url)
 
-casper.run()
+casper.run ->
+    @log "test_view_login_google finished."
+    this.test.renderResults true
 
